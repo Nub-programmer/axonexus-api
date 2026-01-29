@@ -1,9 +1,16 @@
+import logging
+from typing import Optional
+
 from app.providers.base import BaseProvider
 from app.core.schemas import ChatRequest, ChatResponse, Choice, Message, Usage
 
+logger = logging.getLogger(__name__)
+
 
 class MockProvider(BaseProvider):
-    def chat_completion(self, request: ChatRequest) -> ChatResponse:
+    def chat_completion(self, request: ChatRequest, model_name: Optional[str] = None) -> ChatResponse:
+        logger.info(f"MockProvider: handling model '{request.model}'")
+
         last_user_message = ""
         for msg in reversed(request.messages):
             if msg.role == "user":
