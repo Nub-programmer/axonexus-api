@@ -14,3 +14,7 @@ pydantic-settings
 python-dotenv
 uvicorn[standard]
 httpx
+fastapi
+pydantic-settings
+python-dotenv
+uvicorn
