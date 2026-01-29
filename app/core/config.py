@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     app_name: str = "AxonNexus API"
     app_version: str = "0.1.0"
     debug: bool = False
+    api_key: str = "axn_test_123"
     
     class Config:
         env_file = ".env"

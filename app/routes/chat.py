@@ -1,12 +1,16 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.core.schemas import ChatRequest, ChatResponse, Choice, Message, Usage
+from app.core.auth import verify_api_key
 
 router = APIRouter(prefix="/v1", tags=["Chat"])
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def create_chat_completion(request: ChatRequest) -> ChatResponse:
+async def create_chat_completion(
+    request: ChatRequest,
+    api_key: str = Depends(verify_api_key)
+) -> ChatResponse:
     last_user_message = ""
     for msg in reversed(request.messages):
         if msg.role == "user":
