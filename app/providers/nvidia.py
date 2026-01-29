@@ -40,12 +40,15 @@ class NVIDIAProvider(BaseProvider):
                 messages=nvidia_messages
             )
 
+            if not response.usage:
+                raise ValueError("NVIDIA API response missing usage information")
+
             choices = [
                 Choice(
                     index=c.index,
                     message=Message(
-                        role=c.message.role,
-                        content=c.message.content
+                        role=c.message.role or "assistant",
+                        content=c.message.content or ""
                     ),
                     finish_reason=c.finish_reason
                 )
