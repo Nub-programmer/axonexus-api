@@ -4,16 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.schemas import ChatRequest, ChatResponse, ModelListResponse, ModelInfo
 from app.core.auth import verify_api_key
-from app.providers import MockProvider, GroqProvider, NVIDIAProvider
-from app.models.registry import resolve_model, get_available_models
+from app.providers.router import get_router
+from app.models.registry import get_available_models
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1", tags=["Chat"])
 
-mock_provider = MockProvider()
-groq_provider = GroqProvider()
-nvidia_provider = NVIDIAProvider()
+provider_router = get_router()
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -21,49 +19,20 @@ def create_chat_completion(
     request: ChatRequest,
     api_key: str = Depends(verify_api_key)
 ) -> ChatResponse:
-    model_alias = request.model
-    resolved = resolve_model(model_alias)
-
-    if not resolved:
-        logger.warning(f"Unsupported model requested: {model_alias}")
+    try:
+        return provider_router.route_chat(request)
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Model '{model_alias}' is not supported. Please use a valid model alias."
+            detail=str(e)
         )
-
-    provider = resolved["provider"]
-    internal_model = resolved["internal_model"]
-
-    if provider == "mock":
-        logger.info(f"Routing to MockProvider for model: {model_alias}")
-        return mock_provider.chat_completion(request)
-
-    if provider == "nvidia":
-        logger.info(f"Routing to NVIDIAProvider for model: {internal_model}")
-        try:
-            return nvidia_provider.chat_completion(request, model_name=internal_model)
-        except Exception as e:
-            logger.error(f"Provider error: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="The requested model provider returned an error."
-            )
-
-    if provider == "groq":
-        logger.info(f"Routing to GroqProvider for model: {internal_model}")
-        try:
-            return groq_provider.chat_completion(request, model_name=internal_model)
-        except Exception as e:
-            logger.error(f"Provider error: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="The requested model provider returned an error."
-            )
-
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"Model '{model_alias}' is correctly registered but its provider '{provider}' is not implemented."
-    )
+    except Exception as e:
+        logger.error(f"Provider routing error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The requested model provider returned an error."
+        )
 
 
 @router.get("/models", response_model=ModelListResponse)
