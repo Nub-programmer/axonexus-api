@@ -2,10 +2,10 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.schemas import ChatRequest, ChatResponse
+from app.core.schemas import ChatRequest, ChatResponse, ModelListResponse, ModelInfo
 from app.core.auth import verify_api_key
 from app.providers import MockProvider, GroqProvider, NVIDIAProvider
-from app.core.models import resolve_model
+from app.models.registry import resolve_model, get_available_models
 
 logger = logging.getLogger(__name__)
 
@@ -64,3 +64,13 @@ def create_chat_completion(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"Model '{model_alias}' is correctly registered but its provider '{provider}' is not implemented."
     )
+
+
+@router.get("/models", response_model=ModelListResponse)
+def list_models() -> ModelListResponse:
+    """Lists all available model aliases."""
+    models = [
+        ModelInfo(id=alias)
+        for alias in get_available_models()
+    ]
+    return ModelListResponse(data=models)

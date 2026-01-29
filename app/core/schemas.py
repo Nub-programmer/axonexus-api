@@ -42,3 +42,14 @@ class HealthResponse(BaseModel):
     app_name: str
     version: str
     timestamp: datetime
+
+
+class ModelInfo(BaseModel):
+    id: str
+    object: str = "model"
+    owned_by: str = "axon"
+
+
+class ModelListResponse(BaseModel):
+    object: str = "list"
+    data: List[ModelInfo]
