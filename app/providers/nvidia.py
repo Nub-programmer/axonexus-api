@@ -37,7 +37,7 @@ class NVIDIAProvider(BaseProvider):
 
             response = self.client.chat.completions.create(
                 model=model,
-                messages=nvidia_messages
+                messages=nvidia_messages  # type: ignore
             )
 
             if not response.usage:
