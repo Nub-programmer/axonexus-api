@@ -34,7 +34,7 @@ def create_chat_completion(
         except Exception as e:
             logger.error(f"OpenAIProvider error: {e}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"OpenAI API error: {str(e)}"
             )
 
