@@ -8,3 +8,8 @@ pydantic
 pydantic-settings
 python-dotenv
 uvicorn[standard]
+fastapi
+pydantic
+pydantic-settings
+python-dotenv
+uvicorn[standard]
