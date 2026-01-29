@@ -41,7 +41,7 @@ class NVIDIAProvider(BaseProvider):
             )
 
             if not response.usage:
-                raise ValueError("NVIDIA API response missing usage information")
+                raise ValueError("Provider API response missing usage information")
 
             choices = [
                 Choice(
@@ -65,11 +65,11 @@ class NVIDIAProvider(BaseProvider):
                 id=response.id,
                 object="chat.completion",
                 created=response.created,
-                model=response.model,
+                model=request.model,  # Return the alias, not internal name
                 choices=choices,
                 usage=usage
             )
 
         except Exception as e:
-            logger.error(f"NVIDIA API error: {e}")
+            logger.error(f"Provider API error: {e}")
             raise e

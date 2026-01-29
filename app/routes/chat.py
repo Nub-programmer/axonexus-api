@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.schemas import ChatRequest, ChatResponse
 from app.core.auth import verify_api_key
 from app.providers import MockProvider, GroqProvider, NVIDIAProvider
+from app.core.models import resolve_model
 
 logger = logging.getLogger(__name__)
 
@@ -20,40 +21,46 @@ def create_chat_completion(
     request: ChatRequest,
     api_key: str = Depends(verify_api_key)
 ) -> ChatResponse:
-    model = request.model
+    model_alias = request.model
+    resolved = resolve_model(model_alias)
 
-    if model == "axon-mock":
-        logger.info(f"Routing to MockProvider for model: {model}")
+    if not resolved:
+        logger.warning(f"Unsupported model requested: {model_alias}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Model '{model_alias}' is not supported. Please use a valid model alias."
+        )
+
+    provider = resolved["provider"]
+    internal_model = resolved["internal_model"]
+
+    if provider == "mock":
+        logger.info(f"Routing to MockProvider for model: {model_alias}")
         return mock_provider.chat_completion(request)
 
-    if model.startswith("nvidia:") or model == "meta/llama-3.1-8b-instruct":
-        nvidia_model = model[7:] if model.startswith("nvidia:") else model
-        logger.info(f"Routing to NVIDIAProvider for model: {nvidia_model}")
+    if provider == "nvidia":
+        logger.info(f"Routing to NVIDIAProvider for model: {internal_model}")
         try:
-            return nvidia_provider.chat_completion(request, model_name=nvidia_model)
+            return nvidia_provider.chat_completion(request, model_name=internal_model)
         except Exception as e:
-            logger.error(f"NVIDIAProvider error: {e}")
+            logger.error(f"Provider error: {e}")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"NVIDIA API error: {str(e)}"
+                detail="The requested model provider returned an error."
             )
 
-    if model.startswith("groq:"):
-        groq_model = model[5:]
-        logger.info(f"Routing to GroqProvider for model: {groq_model}")
+    if provider == "groq":
+        logger.info(f"Routing to GroqProvider for model: {internal_model}")
         try:
-            return groq_provider.chat_completion(request, model_name=groq_model)
-        except ValueError as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=str(e)
-            )
+            return groq_provider.chat_completion(request, model_name=internal_model)
         except Exception as e:
-            logger.error(f"GroqProvider error: {e}")
+            logger.error(f"Provider error: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Groq API error: {str(e)}"
+                detail="The requested model provider returned an error."
             )
 
-    logger.info(f"Unknown model '{model}', defaulting to MockProvider")
-    return mock_provider.chat_completion(request)
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"Model '{model_alias}' is correctly registered but its provider '{provider}' is not implemented."
+    )

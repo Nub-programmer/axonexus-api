@@ -19,3 +19,8 @@ pydantic-settings
 python-dotenv
 uvicorn
 openai
+fastapi
+httpx
+pydantic
+python-dotenv
+uvicorn
