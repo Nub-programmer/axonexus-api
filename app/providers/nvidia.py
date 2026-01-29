@@ -1,5 +1,4 @@
 import logging
-import random
 from typing import Optional
 
 from openai import OpenAI
@@ -10,49 +9,37 @@ from app.core.config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-class OpenAIProvider(BaseProvider):
+class NVIDIAProvider(BaseProvider):
     def __init__(self):
-        self.keys = [
-            settings.openai_key_1,
-            settings.openai_key_2,
-            settings.openai_key_3
-        ]
-        # Filter out empty keys
-        self.active_keys = [k for k in self.keys if k]
-        if not self.active_keys:
-            logger.warning("No OpenAI keys found in environment")
+        if not settings.nvidia_api_key:
+            logger.error("NVIDIA_API_KEY is missing in environment")
+            self.client = None
+        else:
+            self.client = OpenAI(
+                base_url="https://integrate.api.nvidia.com/v1",
+                api_key=settings.nvidia_api_key
+            )
 
     def chat_completion(self, request: ChatRequest, model_name: Optional[str] = None) -> ChatResponse:
-        model = model_name or request.model
-        # Strip 'openai:' prefix if present
-        if model.startswith("openai:"):
-            model = model[7:]
-            
-        logger.info(f"OpenAIProvider: sending request for model '{model}'")
+        model = model_name or "meta/llama-3.1-8b-instruct"
+        
+        if not self.client:
+            raise ValueError("NVIDIA API key not configured. Please check your .env file.")
 
-        if not self.active_keys:
-            raise ValueError("No OpenAI API keys configured")
-
-        selected_key = random.choice(self.active_keys)
-        # Obfuscate key in logs
-        masked_key = f"{selected_key[:8]}...{selected_key[-4:]}"
-        logger.info(f"Using OpenAI key: {masked_key}")
+        logger.info(f"NVIDIAProvider: sending request for model '{model}'")
 
         try:
-            client = OpenAI(api_key=selected_key)
-            
-            # Convert internal messages to OpenAI format
-            openai_messages = [
+            # Convert internal messages to OpenAI format (NVIDIA LLaMA API is OpenAI compatible)
+            nvidia_messages = [
                 {"role": m.role, "content": m.content}
                 for m in request.messages
             ]
 
-            response = client.chat.completions.create(
+            response = self.client.chat.completions.create(
                 model=model,
-                messages=openai_messages
+                messages=nvidia_messages
             )
 
-            # Map OpenAI response to our internal ChatResponse schema
             choices = [
                 Choice(
                     index=c.index,
@@ -81,5 +68,5 @@ class OpenAIProvider(BaseProvider):
             )
 
         except Exception as e:
-            logger.error(f"OpenAI API error: {e}")
+            logger.error(f"NVIDIA API error: {e}")
             raise e

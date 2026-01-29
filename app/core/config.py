@@ -7,9 +7,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     debug: bool = False
     api_key: str = "axn_test_123"
-    openai_key_1: str = ""
-    openai_key_2: str = ""
-    openai_key_3: str = ""
+    nvidia_api_key: str = ""
     
     class Config:
         env_file = ".env"
