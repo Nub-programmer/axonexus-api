@@ -64,9 +64,25 @@ MODEL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "axon-mock": {
         "provider": "mock",
         "internal_model": "axon-mock",
-        "required_key": None
+        "required_key": None,
+        "premium": False,
+        "large": False
     }
 }
+
+# Define model tiers
+for model in MODEL_REGISTRY:
+    # Mark large models
+    if "70b" in model or "large" in model:
+        MODEL_REGISTRY[model]["large"] = True
+    else:
+        MODEL_REGISTRY[model]["large"] = False
+        
+    # Mark premium models (OpenRouter/Mistral large)
+    if MODEL_REGISTRY[model]["provider"] in ["openrouter", "mistral"] and MODEL_REGISTRY[model]["large"]:
+        MODEL_REGISTRY[model]["premium"] = True
+    else:
+        MODEL_REGISTRY[model]["premium"] = False
 
 DEFAULT_MODEL = "axon-mock"
 

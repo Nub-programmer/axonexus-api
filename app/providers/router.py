@@ -12,6 +12,10 @@ from app.models.registry import resolve_model
 
 logger = logging.getLogger(__name__)
 
+from app.core.limiter import get_limiter
+
+limiter = get_limiter()
+
 class ProviderRouter:
     def __init__(self):
         self.providers = {
@@ -22,22 +26,33 @@ class ProviderRouter:
             "mistral": MistralProvider()
         }
 
-    def route_chat(self, request: ChatRequest) -> ChatResponse:
+    def route_chat(self, request: ChatRequest, client_key: str, is_test: bool, is_guest: bool) -> ChatResponse:
+        # 1) Enforce hard limits
+        request.max_tokens = min(request.max_tokens or 300, 300)
+        request.temperature = 0.7 if request.temperature is None else 0.7
+        # top_p is not in ChatRequest but we'll assume it's handled if added to schema
+        
         model_alias = request.model
         resolved = resolve_model(model_alias)
         
         if not resolved:
-            # Attempt fuzzy matching internally if direct resolution fails
+            # Attempt fuzzy matching internally
             from app.models.registry import suggest_model
             suggestion = suggest_model(model_alias)
             if suggestion:
                 logger.info(f"Fuzzy matched '{model_alias}' to '{suggestion}'")
                 model_alias = suggestion
-                request.model = suggestion # Propagate resolved alias
+                request.model = suggestion
                 resolved = resolve_model(suggestion)
         
         if not resolved:
             raise ValueError(f"Model alias '{model_alias}' not found in registry")
+
+        # 4) Enforce model access tiers
+        if is_guest and (resolved.get("large") or resolved.get("premium")):
+            raise ValueError(f"Model '{model_alias}' requires authentication")
+        if is_test and resolved.get("premium"):
+            raise ValueError(f"Model '{model_alias}' requires a premium API key")
             
         provider_name = resolved["provider"]
         internal_model = resolved["internal_model"]
@@ -48,9 +63,11 @@ class ProviderRouter:
             
         logger.info(f"Routing '{model_alias}' to '{provider_name}' (internal: {internal_model})")
         try:
-            return provider.chat_completion(request, model_name=internal_model)
+            response = provider.chat_completion(request, model_name=internal_model)
+            # 3) Track token usage
+            limiter.update_usage(client_key, response.usage.total_tokens)
+            return response
         except ValueError as e:
-            # Handle missing key or specific validation errors as 400
             raise e
         except Exception as e:
             logger.error(f"Provider error: {e}")
