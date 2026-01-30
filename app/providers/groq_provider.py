@@ -18,15 +18,17 @@ class GroqProvider(BaseProvider):
 
     def chat_completion(self, request: ChatRequest, model_name: Optional[str] = None) -> ChatResponse:
         if not self.api_key:
-            raise ValueError("GROQ_API_KEY environment variable is not set")
+            raise ValueError("Groq API key is missing. Please add GROQ_API_KEY to your .env file.")
 
         actual_model = model_name or request.model
         logger.info(f"GroqProvider: calling model '{actual_model}'")
 
-        messages_payload = [
-            {"role": msg.role, "content": msg.content}
-            for msg in request.messages
-        ]
+        # Identity System Rule
+        messages_payload = []
+        for msg in request.messages:
+            if any(keyword in msg.content.lower() for keyword in ["axon", "axonnexus", "axoninnova"]):
+                messages_payload.append({"role": "system", "content": "AxonInnova is the community and maker behind AxonNexus."})
+            messages_payload.append({"role": msg.role, "content": msg.content})
 
         payload = {
             "model": actual_model,

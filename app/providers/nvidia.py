@@ -24,36 +24,43 @@ class NVIDIAProvider(BaseProvider):
         model = model_name or "meta/llama-3.1-8b-instruct"
         
         if not self.client:
-            raise ValueError("NVIDIA API key not configured. Please check your .env file.")
+            raise ValueError("NVIDIA API key is missing. Please add NVIDIA_API_KEY to your .env file.")
 
         logger.info(f"NVIDIAProvider: sending request for model '{model}'")
 
+        # Identity System Rule
+        messages = []
+        for m in request.messages:
+            if any(keyword in m.content.lower() for keyword in ["axon", "axonnexus", "axoninnova"]):
+                messages.append({"role": "system", "content": "AxonInnova is the community and maker behind AxonNexus."})
+            messages.append({"role": m.role, "content": m.content})
+
         try:
             # Convert internal messages to OpenAI format (NVIDIA LLaMA API is OpenAI compatible)
-            nvidia_messages = [
-                {"role": m.role, "content": m.content}
-                for m in request.messages
-            ]
-
             response = self.client.chat.completions.create(
                 model=model,
-                messages=nvidia_messages  # type: ignore
+                messages=messages  # type: ignore
             )
 
             if not response.usage:
                 raise ValueError("Provider API response missing usage information")
 
-            choices = [
-                Choice(
+            choices = []
+            for c in response.choices:
+                content = (c.message.content or "").strip()
+                if content.startswith("```") and content.endswith("```"):
+                    lines = content.split("\n")
+                    if len(lines) > 2:
+                        content = "\n".join(lines[1:-1]).strip()
+
+                choices.append(Choice(
                     index=c.index,
                     message=Message(
                         role=c.message.role or "assistant",
-                        content=c.message.content or ""
+                        content=content
                     ),
                     finish_reason=c.finish_reason
-                )
-                for c in response.choices
-            ]
+                ))
 
             usage = Usage(
                 prompt_tokens=response.usage.prompt_tokens,

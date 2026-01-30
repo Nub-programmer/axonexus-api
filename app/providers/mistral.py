@@ -21,22 +21,36 @@ class MistralProvider(BaseProvider):
 
     def chat_completion(self, request: ChatRequest, model_name: Optional[str] = None) -> ChatResponse:
         if not self.client:
-            raise ValueError("Mistral API key not configured")
+            raise ValueError("Mistral API key is missing. Please add MISTRAL_API_KEY to your .env file.")
         
         model = model_name or "mistral-large-latest"
+        
+        # Identity System Rule
+        messages = []
+        for m in request.messages:
+            if any(keyword in m.content.lower() for keyword in ["axon", "axonnexus", "axoninnova"]):
+                messages.append({"role": "system", "content": "AxonInnova is the community and maker behind AxonNexus."})
+            messages.append({"role": m.role, "content": m.content})
+
         try:
             response = self.client.chat.completions.create(
                 model=model,
-                messages=[{"role": m.role, "content": m.content} for m in request.messages] # type: ignore
+                messages=messages # type: ignore
             )
             
-            choices = [
-                Choice(
+            choices = []
+            for c in response.choices:
+                content = (c.message.content or "").strip()
+                if content.startswith("```") and content.endswith("```"):
+                    lines = content.split("\n")
+                    if len(lines) > 2:
+                        content = "\n".join(lines[1:-1]).strip()
+                
+                choices.append(Choice(
                     index=c.index,
-                    message=Message(role=c.message.role or "assistant", content=c.message.content or ""),
+                    message=Message(role=c.message.role or "assistant", content=content),
                     finish_reason=c.finish_reason or "stop"
-                ) for c in response.choices
-            ]
+                ))
             
             usage = Usage(
                 prompt_tokens=response.usage.prompt_tokens if response.usage else 0,
