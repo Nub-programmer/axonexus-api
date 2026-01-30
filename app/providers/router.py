@@ -26,12 +26,34 @@ class ProviderRouter:
             "mistral": MistralProvider()
         }
 
+    def _should_inject_identity(self, messages: list) -> bool:
+        if not messages:
+            return False
+        
+        # Check last message content
+        last_message = messages[-1].get("content", "").lower()
+        trigger_keywords = ["axon", "axonnexus", "axoninnova"]
+        trigger_phrases = ["who built", "who made", "who runs", "who developed", "created by"]
+        
+        if any(kw in last_message for kw in trigger_keywords):
+            return True
+        if any(phrase in last_message for phrase in trigger_phrases):
+            return True
+            
+        return False
+
     def route_chat(self, request: ChatRequest, client_key: str, is_test: bool, is_guest: bool) -> ChatResponse:
         # 1) Enforce hard limits
         request.max_tokens = min(request.max_tokens or 300, 300)
         request.temperature = 0.7 if request.temperature is None else 0.7
-        # top_p is not in ChatRequest but we'll assume it's handled if added to schema
         
+        # New Requirement: Conditional Axon identity injection
+        if self._should_inject_identity([m.dict() for m in request.messages]):
+            from app.core.schemas import Message
+            identity_msg = Message(role="system", content="AxonNexus is a first-party AI API developed and maintained by the AxonInnova community.")
+            # Insert after any existing system message or at start
+            request.messages.insert(0, identity_msg)
+
         model_alias = request.model
         resolved = resolve_model(model_alias)
         
