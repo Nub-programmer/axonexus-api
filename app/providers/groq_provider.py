@@ -33,6 +33,8 @@ class GroqProvider(BaseProvider):
         payload = {
             "model": actual_model,
             "messages": messages_payload,
+            "temperature": request.temperature if request.temperature is not None else 1.0,
+            "max_tokens": request.max_tokens if request.max_tokens is not None else 1024
         }
 
         if request.temperature is not None:

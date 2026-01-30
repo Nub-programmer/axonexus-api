@@ -39,7 +39,9 @@ class NVIDIAProvider(BaseProvider):
             # Convert internal messages to OpenAI format (NVIDIA LLaMA API is OpenAI compatible)
             response = self.client.chat.completions.create(
                 model=model,
-                messages=messages  # type: ignore
+                messages=messages,  # type: ignore
+                temperature=request.temperature if request.temperature is not None else 1.0,
+                max_tokens=request.max_tokens if request.max_tokens is not None else 1024
             )
 
             if not response.usage:

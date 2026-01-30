@@ -36,7 +36,9 @@ class OpenRouterProvider(BaseProvider):
         try:
             response = self.client.chat.completions.create(
                 model=model,
-                messages=messages # type: ignore
+                messages=messages, # type: ignore
+                temperature=request.temperature if request.temperature is not None else 1.0,
+                max_tokens=request.max_tokens if request.max_tokens is not None else 1024
             )
             
             choices = []
