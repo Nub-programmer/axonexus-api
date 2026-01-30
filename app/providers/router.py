@@ -1,6 +1,12 @@
 import logging
 from typing import Dict, Any, Optional
-from app.providers import MockProvider, GroqProvider, NVIDIAProvider
+from app.providers import (
+    MockProvider, 
+    GroqProvider, 
+    NVIDIAProvider, 
+    OpenRouterProvider, 
+    MistralProvider
+)
 from app.core.schemas import ChatRequest, ChatResponse
 from app.models.registry import resolve_model
 
@@ -11,7 +17,9 @@ class ProviderRouter:
         self.providers = {
             "mock": MockProvider(),
             "groq": GroqProvider(),
-            "nvidia": NVIDIAProvider()
+            "nvidia": NVIDIAProvider(),
+            "openrouter": OpenRouterProvider(),
+            "mistral": MistralProvider()
         }
 
     def route_chat(self, request: ChatRequest) -> ChatResponse:

@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     debug: bool = False
     api_key: str = "axn_test_123"
     nvidia_api_key: str = ""
+    openrouter_api_key: str = ""
+    groq_api_key: str = ""
+    mistral_api_key: str = ""
     
     class Config:
         env_file = ".env"
