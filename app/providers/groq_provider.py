@@ -20,6 +20,7 @@ class GroqProvider(BaseProvider):
         if not self.api_key:
             raise ValueError("Groq API key is missing. Please add GROQ_API_KEY to your .env file.")
 
+        # Ensure we use the resolved internal model ID, not the Axon alias
         actual_model = model_name or request.model
         logger.info(f"GroqProvider: calling model '{actual_model}'")
 
@@ -37,44 +38,50 @@ class GroqProvider(BaseProvider):
             "max_tokens": request.max_tokens if request.max_tokens is not None else 1024
         }
 
-        if request.temperature is not None:
-            payload["temperature"] = request.temperature
-        if request.max_tokens is not None:
-            payload["max_tokens"] = request.max_tokens
-
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
 
-        with httpx.Client(timeout=60.0) as client:
-            response = client.post(GROQ_API_URL, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            with httpx.Client(timeout=60.0) as client:
+                response = client.post(GROQ_API_URL, json=payload, headers=headers)
+                if response.status_code == 400:
+                    error_data = response.json()
+                    error_msg = error_data.get("error", {}).get("message", "Invalid request")
+                    raise ValueError(f"Groq API Error (400): {error_msg}. Internal model ID used: '{actual_model}'")
+                response.raise_for_status()
+                data = response.json()
 
-        choices = [
-            Choice(
-                index=choice["index"],
-                message=Message(
-                    role=choice["message"]["role"],
-                    content=choice["message"]["content"]
-                ),
-                finish_reason=choice.get("finish_reason", "stop")
+            choices = [
+                Choice(
+                    index=choice["index"],
+                    message=Message(
+                        role=choice["message"]["role"],
+                        content=choice["message"]["content"].strip()
+                    ),
+                    finish_reason=choice.get("finish_reason", "stop")
+                )
+                for choice in data["choices"]
+            ]
+
+            usage = Usage(
+                prompt_tokens=data["usage"]["prompt_tokens"],
+                completion_tokens=data["usage"]["completion_tokens"],
+                total_tokens=data["usage"]["total_tokens"]
             )
-            for choice in data["choices"]
-        ]
 
-        usage = Usage(
-            prompt_tokens=data["usage"]["prompt_tokens"],
-            completion_tokens=data["usage"]["completion_tokens"],
-            total_tokens=data["usage"]["total_tokens"]
-        )
-
-        return ChatResponse(
-            id=data["id"],
-            object=data["object"],
-            created=data["created"],
-            model=data["model"],
-            choices=choices,
-            usage=usage
-        )
+            return ChatResponse(
+                id=data["id"],
+                object=data["object"],
+                created=data["created"],
+                model=request.model, # Return the Axon alias
+                choices=choices,
+                usage=usage
+            )
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Groq API HTTP error: {e.response.text}")
+            raise RuntimeError(f"Groq API error: {e.response.status_code} - {e.response.text}")
+        except Exception as e:
+            logger.error(f"GroqProvider unexpected error: {e}")
+            raise e
