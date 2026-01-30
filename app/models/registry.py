@@ -79,18 +79,15 @@ def resolve_model(alias: str) -> Optional[Dict[str, Any]]:
     # Check if required key is present
     required_key = model_info.get("required_key")
     if required_key and not getattr(settings, required_key):
-        return None
+        # We don't return None here anymore, we return the info but the router will fail
+        # Or we can return it and let the provider handle the missing key error
+        pass
         
     return model_info
 
 def get_available_models() -> List[str]:
-    """Returns a list of all model aliases that have configured keys."""
-    available = []
-    for alias, info in MODEL_REGISTRY.items():
-        required_key = info.get("required_key")
-        if not required_key or getattr(settings, required_key):
-            available.append(alias)
-    return available
+    """Returns a list of all model aliases."""
+    return list(MODEL_REGISTRY.keys())
 
 def suggest_model(alias: str) -> Optional[str]:
     """Suggests the closest model alias using fuzzy matching among available models."""
