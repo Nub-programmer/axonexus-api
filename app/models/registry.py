@@ -28,12 +28,12 @@ MODEL_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
     "axon-llama-3-70b": {
         "provider": "groq",
-        "internal_model": "llama3-70b-8192",
+        "internal_model": "llama-3.3-70b-versatile",
         "required_key": "groq_api_key"
     },
     "axon-llama-3-8b": {
         "provider": "groq",
-        "internal_model": "llama3-8b-8192",
+        "internal_model": "llama-3.1-8b-instant",
         "required_key": "groq_api_key"
     },
     "axon-mixtral": {
